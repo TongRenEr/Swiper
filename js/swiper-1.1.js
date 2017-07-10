@@ -6,13 +6,20 @@ var Swiper = {
 
     duration: 0, // 动画时长
 
+    autoPlay: false, // 是否自动播放
+    autoTimer: 0,
+    autoInterval: 2500,
+
     nextBtn: undefined,
     preBtn: undefined,
     wrapper: undefined,
+    pointNav: undefined,
     itemWidth: 0,
 
     index: 1,
     curIndex: 1,
+
+    realCount: 0,
     count: 0,
 
     offsetLeft: 0, // 偏移量
@@ -22,7 +29,7 @@ var Swiper = {
     /**
      * 初始化
      */
-    init: function (duration) {
+    init: function (duration, autoPlay) {
 
         // 自定义bind方法
         if (!Function.prototype.bind) {
@@ -51,9 +58,11 @@ var Swiper = {
         }
 
         // 初始化数据
-        this.duration = duration || 0;
+        this.duration = (duration > 1000 ? 1000 : duration) || 0;
+        this.autoPlay = autoPlay || false;
+
         this.wrapper = document.querySelector('.wrapper');
-        this.count = this.wrapper.children.length;
+        this.realCount = this.count = this.wrapper.children.length;
 
         var width = document.querySelector('.item').style.width;
 
@@ -90,6 +99,10 @@ var Swiper = {
             this.initClickEvent();
             this.initTouchEvent();
 
+            if(this.autoPlay){
+                this.autoTimer = setInterval(this.next.bind(this), this.autoInterval);
+            }
+
         } else if(this.count > 2){
 
             var cloneNode = this.wrapper.children[this.count-1].cloneNode(true);
@@ -107,6 +120,11 @@ var Swiper = {
 
             this.initClickEvent();
             this.initTouchEvent();
+            //this.createPoint();
+
+            if(this.autoPlay){
+                this.autoTimer = setInterval(this.next.bind(this), this.autoInterval);
+            }
         }
     },
 
@@ -142,16 +160,19 @@ var Swiper = {
      */
     next: function () {
 
+        if(this.autoTimer) clearInterval(this.autoTimer);
+
         this.index++;
+        this.curIndex = this.curIndex%this.realCount === 0 ? 1 : (++this.curIndex);
 
         if(this.duration){
 
             // 移动速度
-            var speed = this.itemWidth/this.duration;
+            var speed = this.itemWidth/this.duration * 100;
             // 快速点击时 **
             var timer = setInterval(function () {
                 // 计算偏移量
-                var oleft = this.wrapper.offsetLeft - speed * 50;
+                var oleft = this.wrapper.offsetLeft - speed;
                 // 当偏移量大于标准值时，移动完成并停止轮询
                 if(oleft < -this.itemWidth * (this.index-1)){ //
                     oleft = -this.itemWidth * (this.index-1);
@@ -167,6 +188,7 @@ var Swiper = {
             this.wrapper.style.left = this.wrapper.offsetLeft - this.itemWidth + 'px';
         }
 
+        this.changePoint();
 
         if(this.index%this.count === 0){ // 判断是否为最后一个
 
@@ -181,6 +203,10 @@ var Swiper = {
 
             this.index--;
         }
+
+        if(this.autoPlay){
+            this.autoTimer = setInterval(this.next.bind(this), this.autoInterval);
+        }
     },
     
     /**
@@ -188,17 +214,21 @@ var Swiper = {
      */
     pre: function () {
 
+        if(this.autoTimer) clearInterval(this.autoTimer);
+
         this.index--;
+
+        this.curIndex = this.curIndex%this.realCount === 1 ? this.realCount : (--this.curIndex);
 
         if(this.duration){
 
             // 移动速度
-            var speed = this.itemWidth/this.duration;
+            var speed = this.itemWidth/this.duration * 100;
             // 快速点击时 **
             var timer = setInterval(function () {
                 // 计算偏移量
 
-                var oright = this.wrapper.offsetLeft + speed * 50;
+                var oright = this.wrapper.offsetLeft + speed;
                 // 当偏移量大于标准值时，移动完成并停止轮询
                 if(oright > -this.itemWidth * (this.index-1)){ //
                     oright = -this.itemWidth * (this.index-1);
@@ -214,6 +244,8 @@ var Swiper = {
             this.wrapper.style.left = this.wrapper.offsetLeft + this.itemWidth + 'px';
         }
 
+        this.changePoint();
+
         if(this.index%this.count === 1){ // 判断是否为第一个
 
             // 复制第一个节点
@@ -226,6 +258,10 @@ var Swiper = {
 
             this.index++
         }
+
+        if(this.autoPlay){
+            this.autoTimer = setInterval(this.next.bind(this), this.autoInterval);
+        }
     },
 
     /**
@@ -236,6 +272,8 @@ var Swiper = {
 
         // 如果这个元素的位置内只有一个手指的话
         if(event.targetTouches.length === 1){
+
+            if(this.autoTimer) clearInterval(this.autoTimer);
 
             // 阻止浏览器默认事件，重要
             event.preventDefault();
@@ -280,12 +318,14 @@ var Swiper = {
 
             if(this.durationX > 0) { //向手指向右滑动
 
-
-
                 if(this.durationX > 0.3*this.itemWidth){
                     this.pre();
                 } else {
                     this.wrapper.style.left = this.offsetLeft + 'px';
+
+                    if(this.autoPlay){
+                        this.autoTimer = setInterval(this.next.bind(this), this.autoInterval);
+                    }
                 }
 
             }
@@ -296,7 +336,45 @@ var Swiper = {
                     this.next();
                 } else {
                     this.wrapper.style.left = this.offsetLeft + 'px';
+
+                    if(this.autoPlay){
+                        this.autoTimer = setInterval(this.next.bind(this), this.autoInterval);
+                    }
                 }
+            }
+        }
+    },
+
+    /**
+     * 创建圆点
+     */
+    createPoint: function () {
+
+        var parent = document.querySelector('.pointNav');
+
+        for(var i = 0; i <  this.realCount; i++){
+
+            var span = document.createElement('span');
+            span.setAttribute('class', 'point');
+            parent.appendChild(span);
+        }
+        // 默认选中第一个
+        parent.children[0].setAttribute('class', 'point pointA');
+    },
+
+    /**
+     * 切换圆点
+     */
+    changePoint: function () {
+
+        var parent = document.querySelector('.pointNav');
+
+        for(var i = 0; i <  this.realCount; i++){
+
+            if(i === this.curIndex - 1){
+                parent.children[i].setAttribute('class', 'point pointA');
+            } else {
+                parent.children[i].setAttribute('class', 'point');
             }
         }
     }
